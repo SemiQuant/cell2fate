@@ -118,7 +118,8 @@ def run_cell2fate_pipeline_with_offline_enrichment(data_path, results_path, data
         species='Mouse',  # or 'Human' depending on your data
         p_adj_cutoff=0.01,
         n_top_genes=100,
-        local_gene_sets=gene_sets_dir  # Use offline gene sets
+        local_gene_sets=gene_sets_dir,  # Use offline gene sets
+        gene_sets=None  # Use default gene sets, or specify custom ones
     )
     
     # Display results
@@ -177,6 +178,74 @@ def run_cell2fate_pipeline_with_offline_enrichment(data_path, results_path, data
     return mod, adata, tab, results
 
 
+def demonstrate_custom_gene_sets(mod, adata, gene_sets_dir):
+    """
+    Demonstrate usage of custom gene sets for enrichment analysis.
+    
+    Parameters
+    ----------
+    mod : Cell2fate_DynamicalModel
+        Trained cell2fate model
+    adata : AnnData
+        Processed AnnData object
+    gene_sets_dir : str
+        Path to directory containing gene set files
+    """
+    
+    print("\n=== Demonstrating Custom Gene Sets ===\n")
+    
+    background = list(adata.var_names)
+    
+    # Example 1: Use default gene sets (same as before)
+    print("Example 1: Using default gene sets...")
+    tab_default, results_default = mod.get_module_top_features(
+        adata=adata,
+        background=background,
+        species='Mouse',
+        p_adj_cutoff=0.01,
+        n_top_genes=50,
+        local_gene_sets=gene_sets_dir,
+        gene_sets=None  # Uses default: ['GO_Biological_Process_2021']
+    )
+    print(f"Default gene sets results: {len(results_default)} modules analyzed")
+    
+    # Example 2: Use custom gene sets for Mouse
+    print("\nExample 2: Using custom gene sets for Mouse...")
+    custom_gene_sets_mouse = ['GO_Biological_Process_2021', 'GO_Cellular_Component_2021']
+    tab_custom_mouse, results_custom_mouse = mod.get_module_top_features(
+        adata=adata,
+        background=background,
+        species='Mouse',
+        p_adj_cutoff=0.01,
+        n_top_genes=50,
+        local_gene_sets=gene_sets_dir,
+        gene_sets=custom_gene_sets_mouse
+    )
+    print(f"Custom Mouse gene sets results: {len(results_custom_mouse)} modules analyzed")
+    
+    # Example 3: Use specific gene sets for Human (if applicable)
+    print("\nExample 3: Using specific gene sets for Human...")
+    specific_gene_sets_human = ['KEGG_2021_Human']
+    tab_specific_human, results_specific_human = mod.get_module_top_features(
+        adata=adata,
+        background=background,
+        species='Human',
+        p_adj_cutoff=0.01,
+        n_top_genes=50,
+        local_gene_sets=gene_sets_dir,
+        gene_sets=specific_gene_sets_human
+    )
+    print(f"Specific Human gene sets results: {len(results_specific_human)} modules analyzed")
+    
+    print("\nCustom gene sets demonstration complete!")
+    
+    return {
+        'default': (tab_default, results_default),
+        'custom_mouse': (tab_custom_mouse, results_custom_mouse),
+        'specific_human': (tab_specific_human, results_specific_human)
+    }
+
+
 def main():
     """Main function with example usage."""
     
@@ -192,13 +261,21 @@ def main():
     print("To run this example:")
     print("1. Update the data_path and results_path variables")
     print("2. Ensure you have the required data file")
-    print("3. Uncomment the function call below")
+    print("3. Uncomment the function calls below")
     print("4. Run the script")
     
-    # Uncomment the line below when you have actual data:
+    # Uncomment the lines below when you have actual data:
     # mod, adata, tab, results = run_cell2fate_pipeline_with_offline_enrichment(data_path, results_path, data_name)
+    # 
+    # # Demonstrate custom gene sets usage
+    # gene_sets_dir = os.path.join(results_path, "gene_sets")
+    # custom_results = demonstrate_custom_gene_sets(mod, adata, gene_sets_dir)
     
-    print("\nExample code prepared. Update paths and uncomment the function call to run.")
+    print("\nExample code prepared. Update paths and uncomment the function calls to run.")
+    print("The example includes:")
+    print("- Complete pipeline with offline enrichment")
+    print("- Demonstration of custom gene sets usage")
+    print("- Multiple examples showing different gene set configurations")
 
 
 if __name__ == "__main__":

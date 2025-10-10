@@ -94,7 +94,8 @@ tab, results = mod.get_module_top_features(
     species='Mouse',
     p_adj_cutoff=0.01,
     n_top_genes=100,
-    local_gene_sets=gene_sets_dir  # Use offline gene sets
+    local_gene_sets=gene_sets_dir,  # Use offline gene sets
+    gene_sets=None  # Use default gene sets, or specify custom ones
 )
 
 # Display results
@@ -142,9 +143,48 @@ The downloaded gene sets are stored as GMT (Gene Matrix Transpose) files:
 - `KEGG_2021_Human.gmt`: KEGG pathways (Human)
 - `KEGG_2019_Mouse.gmt`: KEGG pathways (Mouse)
 
+## Custom Gene Sets
+
+You can specify custom gene sets for enrichment analysis using the `gene_sets` parameter:
+
+```python
+# Use default gene sets (same as before)
+tab, results = mod.get_module_top_features(
+    adata=adata,
+    background=background,
+    species='Mouse',
+    local_gene_sets=gene_sets_dir,
+    gene_sets=None  # Uses defaults: ['GO_Biological_Process_2021'] for Mouse
+)
+
+# Use custom gene sets
+tab, results = mod.get_module_top_features(
+    adata=adata,
+    background=background,
+    species='Mouse',
+    local_gene_sets=gene_sets_dir,
+    gene_sets=['GO_Biological_Process_2021', 'GO_Cellular_Component_2021']  # Custom selection
+)
+
+# Use specific gene sets for Human
+tab, results = mod.get_module_top_features(
+    adata=adata,
+    background=background,
+    species='Human',
+    local_gene_sets=gene_sets_dir,
+    gene_sets=['KEGG_2021_Human']  # Only KEGG pathways
+)
+```
+
+### Default Gene Sets by Species
+
+- **Mouse**: `['GO_Biological_Process_2021']`
+- **Human**: `['GO_Biological_Process_2021', 'GO_Cellular_Component_2021', 'KEGG_2021_Human']`
+
 ## Notes
 
 - The offline enrichment analysis uses hypergeometric testing with FDR correction
 - Results are compatible with the online Enrichr API format
 - Gene sets are downloaded from the Maayan Lab Enrichr database
 - Requires internet access only for initial download
+- The `gene_sets` parameter allows customization while maintaining backward compatibility

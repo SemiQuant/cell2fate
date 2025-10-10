@@ -811,7 +811,7 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
             self.plot_history(int(np.round(self.max_epochs/2)))
         multiplot_from_generator(generatePlots(), 4)
 
-    def get_module_top_features(self, adata, background, species = 'Mouse', p_adj_cutoff = 0.01, n_top_genes = None, local_gene_sets = None):
+    def get_module_top_features(self, adata, background, species = 'Mouse', p_adj_cutoff = 0.01, n_top_genes = None, local_gene_sets = None, gene_sets = None):
         """
         Returns a dataframe with top Genes, TFs, and GO terms of each module.
 
@@ -830,6 +830,10 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
         local_gene_sets
             Path to directory containing local gene set files (.gmt) for offline analysis.
             If provided, uses offline enrichment instead of online Enrichr API.
+        gene_sets
+            List of gene sets to use for enrichment analysis. If None, uses default sets:
+            For Mouse: ['GO_Biological_Process_2021']
+            For Human: ['GO_Biological_Process_2021', 'GO_Cellular_Component_2021', 'KEGG_2021_Human']
 
         Returns
         -------
@@ -909,17 +913,24 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
                 enr = MockEnrichrResult(enr_results)
             else:
                 # Use online Enrichr API
+                # Set default gene sets if not provided
+                if gene_sets is None:
+                    if species == 'Mouse':
+                        gene_sets = ['GO_Biological_Process_2021']  # 'GO_Cellular_Component_2021', 'KEGG_2019_Mouse'
+                    elif species == 'Human':
+                        gene_sets = ['GO_Biological_Process_2021', 'GO_Cellular_Component_2021', 'KEGG_2021_Human']
+                
                 if species == 'Mouse':
                     enr = gp.enrichr(gene_list=gene_list,
                                      background = background,
-                             gene_sets=['GO_Biological_Process_2021'], # 'GO_Cellular_Component_2021', 'KEGG_2019_Mouse'
+                             gene_sets=gene_sets,
                              organism='mouse', # don't forget to set organism to the one you desired! e.g. Yeast
                              outdir=None, # don't write to disk
                             )
                 elif species == 'Human':
                     enr = gp.enrichr(gene_list=gene_list,
                              background = background,
-                         gene_sets=['GO_Biological_Process_2021', 'GO_Cellular_Component_2021', 'KEGG_2021_Human'],
+                         gene_sets=gene_sets,
                          organism='human', # don't forget to set organism to the one you desired! e.g. Yeast
                          outdir=None, # don't write to disk
                         )
