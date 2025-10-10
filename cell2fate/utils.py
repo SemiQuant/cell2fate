@@ -15,6 +15,9 @@ from contextlib import contextmanager
 import seaborn as sns
 import os,sys
 import cell2fate as c2f
+import click
+import requests
+from pathlib import Path
 
 import torch
 
@@ -471,3 +474,168 @@ def mu_mRNA_continousAlpha_globalTime_twoStates(alpha_ON, alpha_OFF, beta, gamma
     mu_RNAvelocity = torch.clip(mu_mRNA_continuousAlpha(alpha_cg, beta, gamma, tau_cg,
                                                          u0_g, s0_g, delta_alpha, lam_g), min = 10**(-5))
     return mu_RNAvelocity
+
+def download_gene_sets(output_dir='gene_sets', species='Human', gene_sets=None):
+    """
+    Download gene sets from Enrichr for offline use.
+    
+    Parameters
+    ----------
+    output_dir
+        Directory to save gene set files. Defaults to 'gene_sets'.
+    species
+        Species for gene sets ('Human' or 'Mouse'). Defaults to 'Human'.
+    gene_sets
+        List of gene set names to download. If None, downloads default sets.
+        
+    Returns
+    -------
+    List
+        List of downloaded file paths.
+    """
+    if gene_sets is None:
+        if species == 'Human':
+            gene_sets = ['GO_Biological_Process_2021', 'GO_Cellular_Component_2021', 'KEGG_2021_Human']
+        elif species == 'Mouse':
+            gene_sets = ['GO_Biological_Process_2021', 'GO_Cellular_Component_2021', 'KEGG_2019_Mouse']
+        else:
+            raise ValueError(f"Unsupported species: {species}. Use 'Human' or 'Mouse'.")
+    
+    # Create output directory
+    output_path = Path(output_dir)
+    output_path.mkdir(exist_ok=True)
+    
+    downloaded_files = []
+    
+    with click.progressbar(gene_sets, label='Downloading gene sets') as bar:
+        for gene_set in bar:
+            url = f"https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName={gene_set}"
+            output_file = output_path / f"{gene_set}.gmt"
+            
+            try:
+                response = requests.get(url, timeout=30)
+                response.raise_for_status()
+                
+                with open(output_file, 'w') as f:
+                    f.write(response.text)
+                
+                downloaded_files.append(str(output_file))
+                click.echo(f"Downloaded: {gene_set}")
+                
+            except requests.RequestException as e:
+                click.echo(f"Error downloading {gene_set}: {e}", err=True)
+                continue
+    
+    click.echo(f"Downloaded {len(downloaded_files)} gene sets to {output_dir}")
+    return downloaded_files
+
+def parse_gmt_file(gmt_file):
+    """
+    Parse a GMT (Gene Matrix Transpose) file and return gene sets.
+    
+    Parameters
+    ----------
+    gmt_file
+        Path to GMT file.
+        
+    Returns
+    -------
+    Dict
+        Dictionary mapping gene set names to lists of genes.
+    """
+    gene_sets = {}
+    
+    with open(gmt_file, 'r') as f:
+        for line in f:
+            parts = line.strip().split('\t')
+            if len(parts) >= 3:
+                gene_set_name = parts[0]
+                description = parts[1]
+                genes = parts[2:]
+                gene_sets[gene_set_name] = genes
+    
+    return gene_sets
+
+def offline_enrichment(gene_list, background, gene_sets_dict, p_adj_cutoff=0.01):
+    """
+    Perform offline enrichment analysis using local gene sets.
+    
+    Parameters
+    ----------
+    gene_list
+        List of genes to test for enrichment.
+    background
+        List of background genes.
+    gene_sets_dict
+        Dictionary mapping gene set names to lists of genes.
+    p_adj_cutoff
+        Adjusted p-value cutoff for significance.
+        
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with enrichment results.
+    """
+    import pandas as pd
+    from scipy.stats import hypergeom
+    from statsmodels.stats.multitest import multipletests
+    
+    results = []
+    
+    for gene_set_name, gene_set_genes in gene_sets_dict.items():
+        # Convert to sets for efficient operations
+        gene_list_set = set(gene_list)
+        background_set = set(background)
+        gene_set_set = set(gene_set_genes)
+        
+        # Find overlaps
+        genes_in_set = gene_list_set.intersection(gene_set_set)
+        genes_in_background = background_set.intersection(gene_set_set)
+        
+        # Skip if no genes in background
+        if len(genes_in_background) == 0:
+            continue
+            
+        # Calculate hypergeometric test
+        N = len(background_set)  # Total genes in background
+        K = len(genes_in_background)  # Genes in gene set that are in background
+        n = len(gene_list)  # Genes in query list
+        x = len(genes_in_set)  # Genes in query list that are in gene set
+        
+        if K == 0 or n == 0:
+            continue
+            
+        # Hypergeometric test
+        p_value = hypergeom.sf(x-1, N, K, n)
+        
+        # Calculate odds ratio
+        if x == 0 or (K-x) == 0:
+            odds_ratio = 0
+        else:
+            odds_ratio = (x * (N - K - n + x)) / ((n - x) * (K - x))
+        
+        results.append({
+            'Term': gene_set_name,
+            'Overlap': f"{x}/{len(gene_list)}",
+            'P-value': p_value,
+            'Adjusted P-value': p_value,  # Will be adjusted later
+            'Odds Ratio': odds_ratio,
+            'Combined Score': x * np.log10(p_value) if p_value > 0 else 0,
+            'Genes': ', '.join(sorted(genes_in_set))
+        })
+    
+    if not results:
+        return pd.DataFrame()
+    
+    # Convert to DataFrame
+    df = pd.DataFrame(results)
+    
+    # Adjust p-values
+    if len(df) > 0:
+        _, p_adjusted, _, _ = multipletests(df['P-value'], method='fdr_bh')
+        df['Adjusted P-value'] = p_adjusted
+    
+    # Sort by adjusted p-value
+    df = df.sort_values('Adjusted P-value')
+    
+    return df

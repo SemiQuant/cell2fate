@@ -37,6 +37,7 @@ from cell2fate._pyro_mixin import QuantileMixin
 from ._cell2fate_DynamicalModel_module import \
 Cell2fate_DynamicalModel_module
 from cell2fate.utils import multiplot_from_generator
+from cell2fate.utils import offline_enrichment, parse_gmt_file
 
 from cell2fate.utils import mu_mRNA_continousAlpha_globalTime_twoStates
 import cell2fate as c2f
@@ -810,7 +811,7 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
             self.plot_history(int(np.round(self.max_epochs/2)))
         multiplot_from_generator(generatePlots(), 4)
 
-    def get_module_top_features(self, adata, background, species = 'Mouse', p_adj_cutoff = 0.01, n_top_genes = None):
+    def get_module_top_features(self, adata, background, species = 'Mouse', p_adj_cutoff = 0.01, n_top_genes = None, local_gene_sets = None):
         """
         Returns a dataframe with top Genes, TFs, and GO terms of each module.
 
@@ -826,6 +827,9 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
             Adjusted p-value cutoff for enrichment analysis. Defaults to 0.01.
         n_top_genes
             Number of top genes to consider for each module. Defaults to None.
+        local_gene_sets
+            Path to directory containing local gene set files (.gmt) for offline analysis.
+            If provided, uses offline enrichment instead of online Enrichr API.
 
         Returns
         -------
@@ -873,24 +877,61 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
         results = []
         if not n_top_genes:
             n_top_genes = int(self.module.model.n_vars/n_modules/2)
+        
+        # Load local gene sets if provided
+        gene_sets_dict = {}
+        if local_gene_sets is not None:
+            import os
+            from pathlib import Path
+            gene_sets_dir = Path(local_gene_sets)
+            if species == 'Mouse':
+                gene_set_files = ['GO_Biological_Process_2021.gmt']  # Can add more as needed
+            elif species == 'Human':
+                gene_set_files = ['GO_Biological_Process_2021.gmt', 'GO_Cellular_Component_2021.gmt', 'KEGG_2021_Human.gmt']
+            
+            for gmt_file in gene_set_files:
+                gmt_path = gene_sets_dir / gmt_file
+                if gmt_path.exists():
+                    gene_sets_dict.update(parse_gmt_file(gmt_path))
+                else:
+                    print(f"Warning: Gene set file {gmt_path} not found. Skipping.")
+        
         for m in range(n_modules):
             gene_list = list(gene_by_module_sorted[m,:n_top_genes])
-            if species == 'Mouse':
-                enr = gp.enrichr(gene_list=gene_list,
-                                 background = background,
-                         gene_sets=['GO_Biological_Process_2021'], # 'GO_Cellular_Component_2021', 'KEGG_2019_Mouse'
-                         organism='mouse', # don't forget to set organism to the one you desired! e.g. Yeast
+            
+            if local_gene_sets is not None and gene_sets_dict:
+                # Use offline enrichment
+                enr_results = offline_enrichment(gene_list, background, gene_sets_dict, p_adj_cutoff)
+                # Create a mock object with results attribute to maintain compatibility
+                class MockEnrichrResult:
+                    def __init__(self, results_df):
+                        self.results = results_df
+                enr = MockEnrichrResult(enr_results)
+            else:
+                # Use online Enrichr API
+                if species == 'Mouse':
+                    enr = gp.enrichr(gene_list=gene_list,
+                                     background = background,
+                             gene_sets=['GO_Biological_Process_2021'], # 'GO_Cellular_Component_2021', 'KEGG_2019_Mouse'
+                             organism='mouse', # don't forget to set organism to the one you desired! e.g. Yeast
+                             outdir=None, # don't write to disk
+                            )
+                elif species == 'Human':
+                    enr = gp.enrichr(gene_list=gene_list,
+                             background = background,
+                         gene_sets=['GO_Biological_Process_2021', 'GO_Cellular_Component_2021', 'KEGG_2021_Human'],
+                         organism='human', # don't forget to set organism to the one you desired! e.g. Yeast
                          outdir=None, # don't write to disk
                         )
-            elif species == 'Human':
-                enr = gp.enrichr(gene_list=gene_list,
-                         background = background,
-                     gene_sets=['GO_Biological_Process_2021', 'GO_Cellular_Component_2021', 'KEGG_2021_Human'],
-                     organism='human', # don't forget to set organism to the one you desired! e.g. Yeast
-                     outdir=None, # don't write to disk
-                    )
-            tab.iloc[m,3] = ', '.join(list(enr.results.loc[enr.results['Adjusted P-value'] < p_adj_cutoff,:]['Term']))
-            results += [enr.results.loc[enr.results['Adjusted P-value'] < p_adj_cutoff,:]]
+            
+            # Extract significant terms
+            if len(enr.results) > 0 and 'Adjusted P-value' in enr.results.columns:
+                significant_terms = enr.results.loc[enr.results['Adjusted P-value'] < p_adj_cutoff, 'Term']
+                tab.iloc[m,3] = ', '.join(list(significant_terms))
+                results += [enr.results.loc[enr.results['Adjusted P-value'] < p_adj_cutoff,:]]
+            else:
+                tab.iloc[m,3] = ''
+                results += [enr.results]
         ### Save topGenes, topTFs and topGOterms in dataframe.
         return tab, results
     
