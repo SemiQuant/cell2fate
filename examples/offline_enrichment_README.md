@@ -1,190 +1,59 @@
-# Cell2fate Offline Enrichment Analysis
+# Cell2fate Offline Enrichment
 
-This directory contains examples for using cell2fate with offline gene set enrichment analysis.
+Use cell2fate enrichment analysis without internet access.
 
-## Overview
-
-The offline enrichment functionality allows you to:
-1. Download gene sets from Enrichr for offline use
-2. Perform enrichment analysis without internet access
-3. Use the same interface as online enrichment
+> **🖥️ Running on HPC?** See the comprehensive guide: [hpc_offline_enrichment_guide.md](hpc_offline_enrichment_guide.md)
 
 ## Quick Start
 
-### 1. Download Gene Sets
-
-Using the command-line interface:
-
+**Step 1: Download gene sets** (needs internet)
 ```bash
-# Download default gene sets for Human
-cell2fate download-genesets --species Human
-
-# Download default gene sets for Mouse
-cell2fate download-genesets --species Mouse
-
-# Download to custom directory
-cell2fate download-genesets --output-dir /path/to/gene_sets
+python examples/download_gene_sets_for_hpc.py --species Mouse --output-dir gene_sets
 ```
 
-Or programmatically:
-
-```python
-from cell2fate.utils import download_gene_sets
-
-# Download gene sets
-downloaded_files = download_gene_sets(
-    output_dir='gene_sets',
-    species='Mouse',
-    gene_sets=None  # Use default gene sets
-)
-```
-
-### 2. Use Offline Enrichment in Full Pipeline
-
-Following the [Pancreas tutorial](https://cell2fate.readthedocs.io/en/latest/notebooks/publication_figures/cell2fate_PancreasWithCC.html#):
-
+**Step 2: Use in your analysis** (works offline)
 ```python
 import cell2fate as c2f
-import scanpy as sc
-import os
 
-# Step 1: Download gene sets for offline use
-gene_sets_dir = "gene_sets"
-species = "Mouse"  # or "Human"
+# ... your model setup and training ...
 
-downloaded_files = c2f.utils.download_gene_sets(
-    output_dir=gene_sets_dir,
-    species=species,
-    gene_sets=None
-)
-
-# Step 2: Load and prepare data
-adata = sc.read_h5ad("your_data.h5ad")
-adata = c2f.utils.get_training_data(
-    adata, 
-    cells_per_cluster=10**5, 
-    cluster_column='clusters',
-    remove_clusters=[],
-    min_shared_counts=20, 
-    n_var_genes=3000
-)
-
-# Step 3: Initialize and train the model
-c2f.Cell2fate_DynamicalModel.setup_anndata(
-    adata, 
-    spliced_label='spliced', 
-    unspliced_label='unspliced'
-)
-
-n_modules = c2f.utils.get_max_modules(adata)
-mod = c2f.Cell2fate_DynamicalModel(adata, n_modules=n_modules)
-mod.train()
-
-# Step 4: Export posteriors
-adata = mod.export_posterior(adata)
-
-# Step 5: Compute module summary statistics with offline enrichment
-adata = mod.compute_module_summary_statistics(adata)
-
-# Get top features with offline enrichment
-background = list(adata.var_names)
+# Add local_gene_sets parameter for offline enrichment
 tab, results = mod.get_module_top_features(
     adata=adata,
-    background=background,
+    background=list(adata.var_names),
     species='Mouse',
-    p_adj_cutoff=0.01,
-    n_top_genes=100,
-    local_gene_sets=gene_sets_dir,  # Use offline gene sets
-    gene_sets=None  # Use default gene sets, or specify custom ones
-)
-
-# Display results
-print("Module top features with offline enrichment:")
-print(tab)
-
-# Plot module summary statistics
-mod.plot_module_summary_statistics(adata, save="module_summary_stats_plot.pdf")
-
-# Step 6: Additional analyses
-mod.compare_module_activation(
-    adata, 
-    chosen_modules=[1, 2, 3, 4],
-    save="module_activation_comparison.pdf"
-)
-
-mod.plot_top_features(
-    adata, 
-    tab, 
-    chosen_modules=[1, 2, 3, 4],
-    mode='all genes',
-    n_top_features=3,
-    save="top_features_plot.pdf"
-)
-
-mod.plot_velocity_umap_Bergen2020(
-    adata,
-    use_full_posterior=True,
-    save="velocity_umap.pdf"
+    local_gene_sets='gene_sets'  # ← Use offline gene sets
 )
 ```
 
-## Files
+## Files in This Directory
 
-- `offline_enrichment_example.py`: Basic example script
-- `cell2fate_pipeline_with_offline_enrichment.py`: Pipeline integration example
-- `complete_pipeline_example.py`: Complete working pipeline example
-- `README.md`: This documentation file
-
-## Gene Set Files
-
-The downloaded gene sets are stored as GMT (Gene Matrix Transpose) files:
-- `GO_Biological_Process_2021.gmt`: Gene Ontology Biological Process terms
-- `GO_Cellular_Component_2021.gmt`: Gene Ontology Cellular Component terms  
-- `KEGG_2021_Human.gmt`: KEGG pathways (Human)
-- `KEGG_2019_Mouse.gmt`: KEGG pathways (Mouse)
+- **`download_gene_sets_for_hpc.py`** - Script to download gene sets for offline use
+- **`hpc_offline_enrichment_guide.md`** - Comprehensive guide with troubleshooting
+- **`offline_enrichment_example.py`** - Complete working example code
 
 ## Custom Gene Sets
 
-You can specify custom gene sets for enrichment analysis using the `gene_sets` parameter:
+Customize which gene sets to use:
 
 ```python
-# Use default gene sets (same as before)
+# Download specific gene sets
+python examples/download_gene_sets_for_hpc.py \
+    --species Mouse \
+    --gene-sets GO_Biological_Process_2021 KEGG_2019_Mouse
+
+# Use them in analysis
 tab, results = mod.get_module_top_features(
     adata=adata,
     background=background,
     species='Mouse',
-    local_gene_sets=gene_sets_dir,
-    gene_sets=None  # Uses defaults: ['GO_Biological_Process_2021'] for Mouse
-)
-
-# Use custom gene sets
-tab, results = mod.get_module_top_features(
-    adata=adata,
-    background=background,
-    species='Mouse',
-    local_gene_sets=gene_sets_dir,
-    gene_sets=['GO_Biological_Process_2021', 'GO_Cellular_Component_2021']  # Custom selection
-)
-
-# Use specific gene sets for Human
-tab, results = mod.get_module_top_features(
-    adata=adata,
-    background=background,
-    species='Human',
-    local_gene_sets=gene_sets_dir,
-    gene_sets=['KEGG_2021_Human']  # Only KEGG pathways
+    local_gene_sets='gene_sets',
+    gene_sets=['GO_Biological_Process_2021', 'KEGG_2019_Mouse']
 )
 ```
 
-### Default Gene Sets by Species
+**Default gene sets:**
+- Mouse: `GO_Biological_Process_2021`
+- Human: `GO_Biological_Process_2021`, `GO_Cellular_Component_2021`, `KEGG_2021_Human`
 
-- **Mouse**: `['GO_Biological_Process_2021']`
-- **Human**: `['GO_Biological_Process_2021', 'GO_Cellular_Component_2021', 'KEGG_2021_Human']`
-
-## Notes
-
-- The offline enrichment analysis uses hypergeometric testing with FDR correction
-- Results are compatible with the online Enrichr API format
-- Gene sets are downloaded from the Maayan Lab Enrichr database
-- Requires internet access only for initial download
-- The `gene_sets` parameter allows customization while maintaining backward compatibility
+**For more details, see:** [hpc_offline_enrichment_guide.md](hpc_offline_enrichment_guide.md)

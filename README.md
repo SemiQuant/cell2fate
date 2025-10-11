@@ -52,3 +52,44 @@ Before installing cell2fate and it's dependencies, it could be necessary to make
 ```bash
 export PYTHONNOUSERSITE="someletters"
 ```
+
+## HPC Usage and Offline Enrichment
+
+When running cell2fate on HPC systems where compute nodes don't have internet access, you'll need to use offline enrichment analysis. This is a two-step process:
+
+### Step 1: Download Gene Sets (on login node)
+
+Before submitting your compute job, download gene sets on a login node that has internet access:
+
+```bash
+# Using the convenient download script
+python examples/download_gene_sets_for_hpc.py --species Mouse --output-dir gene_sets
+
+# Or using cell2fate CLI
+cell2fate download-genesets --species Mouse --output-dir gene_sets
+```
+
+### Step 2: Use Offline Enrichment (on compute node)
+
+In your compute job script, specify the path to downloaded gene sets:
+
+```python
+import cell2fate as c2f
+
+# Your analysis code...
+mod = c2f.Cell2fate_DynamicalModel(adata, n_modules=n_modules)
+mod.train()
+
+# Use offline enrichment
+tab, results = mod.get_module_top_features(
+    adata=adata,
+    background=list(adata.var_names),
+    species='Mouse',
+    local_gene_sets='gene_sets',  # Path to downloaded gene sets
+)
+```
+
+For detailed instructions and troubleshooting, see:
+- `examples/hpc_offline_enrichment_guide.md` - Comprehensive HPC guide
+- `examples/offline_enrichment_README.md` - General offline enrichment documentation
+- `examples/offline_enrichment_example.py` - Working code example

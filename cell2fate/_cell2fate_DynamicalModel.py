@@ -882,16 +882,22 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
         if not n_top_genes:
             n_top_genes = int(self.module.model.n_vars/n_modules/2)
         
+        # Set default gene sets if not provided
+        if gene_sets is None:
+            if species == 'Mouse':
+                gene_sets = ['GO_Biological_Process_2021']  # 'GO_Cellular_Component_2021', 'KEGG_2019_Mouse'
+            elif species == 'Human':
+                gene_sets = ['GO_Biological_Process_2021', 'GO_Cellular_Component_2021', 'KEGG_2021_Human']
+        
         # Load local gene sets if provided
         gene_sets_dict = {}
         if local_gene_sets is not None:
             import os
             from pathlib import Path
             gene_sets_dir = Path(local_gene_sets)
-            if species == 'Mouse':
-                gene_set_files = ['GO_Biological_Process_2021.gmt']  # Can add more as needed
-            elif species == 'Human':
-                gene_set_files = ['GO_Biological_Process_2021.gmt', 'GO_Cellular_Component_2021.gmt', 'KEGG_2021_Human.gmt']
+            
+            # Convert gene set names to GMT file names
+            gene_set_files = [f"{gs}.gmt" for gs in gene_sets]
             
             for gmt_file in gene_set_files:
                 gmt_path = gene_sets_dir / gmt_file
@@ -899,6 +905,11 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
                     gene_sets_dict.update(parse_gmt_file(gmt_path))
                 else:
                     print(f"Warning: Gene set file {gmt_path} not found. Skipping.")
+            
+            if not gene_sets_dict:
+                print(f"Error: No gene set files found in {gene_sets_dir}.")
+                print(f"Looked for: {gene_set_files}")
+                print("Skipping enrichment analysis. Returning gene rankings only.")
         
         for m in range(n_modules):
             gene_list = list(gene_by_module_sorted[m,:n_top_genes])
@@ -911,29 +922,40 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
                     def __init__(self, results_df):
                         self.results = results_df
                 enr = MockEnrichrResult(enr_results)
+            elif local_gene_sets is not None and not gene_sets_dict:
+                # No gene sets found in local directory, skip enrichment
+                print(f"Warning: No gene sets available for module {m}. Skipping enrichment.")
+                class MockEnrichrResult:
+                    def __init__(self):
+                        self.results = pd.DataFrame()
+                enr = MockEnrichrResult()
             else:
                 # Use online Enrichr API
-                # Set default gene sets if not provided
-                if gene_sets is None:
+                try:
                     if species == 'Mouse':
-                        gene_sets = ['GO_Biological_Process_2021']  # 'GO_Cellular_Component_2021', 'KEGG_2019_Mouse'
+                        enr = gp.enrichr(gene_list=gene_list,
+                                         background = background,
+                                 gene_sets=gene_sets,
+                                 organism='mouse', # don't forget to set organism to the one you desired! e.g. Yeast
+                                 outdir=None, # don't write to disk
+                                )
                     elif species == 'Human':
-                        gene_sets = ['GO_Biological_Process_2021', 'GO_Cellular_Component_2021', 'KEGG_2021_Human']
-                
-                if species == 'Mouse':
-                    enr = gp.enrichr(gene_list=gene_list,
-                                     background = background,
+                        enr = gp.enrichr(gene_list=gene_list,
+                                 background = background,
                              gene_sets=gene_sets,
-                             organism='mouse', # don't forget to set organism to the one you desired! e.g. Yeast
+                             organism='human', # don't forget to set organism to the one you desired! e.g. Yeast
                              outdir=None, # don't write to disk
                             )
-                elif species == 'Human':
-                    enr = gp.enrichr(gene_list=gene_list,
-                             background = background,
-                         gene_sets=gene_sets,
-                         organism='human', # don't forget to set organism to the one you desired! e.g. Yeast
-                         outdir=None, # don't write to disk
-                        )
+                except Exception as e:
+                    print(f"Error during online enrichment for module {m}: {e}")
+                    print("This may be due to lack of internet access.")
+                    print("Consider using the 'local_gene_sets' parameter for offline enrichment.")
+                    print("See examples/offline_enrichment_README.md for details.")
+                    # Create empty results
+                    class MockEnrichrResult:
+                        def __init__(self):
+                            self.results = pd.DataFrame()
+                    enr = MockEnrichrResult()
             
             # Extract significant terms
             if len(enr.results) > 0 and 'Adjusted P-value' in enr.results.columns:
