@@ -62,10 +62,6 @@ When running cell2fate on HPC systems where compute nodes don't have internet ac
 Before submitting your compute job, download gene sets on a login node that has internet access:
 
 ```bash
-# Using the convenient download script
-python examples/download_gene_sets_for_hpc.py --species Mouse --output-dir gene_sets
-
-# Or using cell2fate CLI
 cell2fate download-genesets --species Mouse --output-dir gene_sets
 ```
 

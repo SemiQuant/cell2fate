@@ -8,7 +8,7 @@
 
 ```bash
 # 1. On login node (with internet):
-python examples/download_gene_sets_for_hpc.py --species Mouse --output-dir gene_sets
+cell2fate download-genesets --species Mouse --output-dir gene_sets
 ```
 
 ```python

@@ -8,7 +8,7 @@ Use cell2fate enrichment analysis without internet access.
 
 **Step 1: Download gene sets** (needs internet)
 ```bash
-python examples/download_gene_sets_for_hpc.py --species Mouse --output-dir gene_sets
+cell2fate download-genesets --species Mouse --output-dir gene_sets
 ```
 
 **Step 2: Use in your analysis** (works offline)
@@ -28,7 +28,6 @@ tab, results = mod.get_module_top_features(
 
 ## Files in This Directory
 
-- **`download_gene_sets_for_hpc.py`** - Script to download gene sets for offline use
 - **`hpc_offline_enrichment_guide.md`** - Comprehensive guide with troubleshooting
 - **`offline_enrichment_example.py`** - Complete working example code
 
@@ -36,12 +35,15 @@ tab, results = mod.get_module_top_features(
 
 Customize which gene sets to use:
 
-```python
+```bash
 # Download specific gene sets
-python examples/download_gene_sets_for_hpc.py \
+cell2fate download-genesets \
     --species Mouse \
-    --gene-sets GO_Biological_Process_2021 KEGG_2019_Mouse
+    --gene-sets GO_Biological_Process_2021 \
+    --gene-sets KEGG_2019_Mouse
+```
 
+```python
 # Use them in analysis
 tab, results = mod.get_module_top_features(
     adata=adata,
