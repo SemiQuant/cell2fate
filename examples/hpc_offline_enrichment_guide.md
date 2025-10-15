@@ -75,8 +75,17 @@ print(f"Use local_gene_sets='{gene_sets_dir}' in your compute job.")
 
 **Using the CLI:**
 ```bash
-# On login node with internet access
+# Basic usage - download default gene sets
 cell2fate download-genesets --species Mouse --output-dir /path/to/your/project/gene_sets
+
+# Download specific gene sets (see (maayanlab)[http://maayanlab.cloud/Enrichr/#libraries])
+cell2fate download-genesets --species Mouse --gene-sets GO_Biological_Process_2021 --gene-sets KEGG_2019_Mouse --output-dir gene_sets
+
+# Download Human gene sets
+cell2fate download-genesets --species Human --output-dir gene_sets
+
+# Download to current directory
+cell2fate download-genesets --species Mouse
 ```
 
 ### Step 2: Run Analysis on Compute Node (offline)
@@ -157,7 +166,7 @@ You can specify which gene sets to use with the `gene_sets` parameter:
 
 ```python
 # Default gene sets (if gene_sets=None):
-# - Mouse: ['GO_Biological_Process_2021']
+# - Mouse: ['HDSigDB_Mouse_2021', 'WikiPathways_2024_Mouse', 'Mouse_Gene_Atlas']
 # - Human: ['GO_Biological_Process_2021', 'GO_Cellular_Component_2021', 'KEGG_2021_Human']
 
 # Custom gene sets for Mouse
@@ -177,7 +186,25 @@ tab, results = mod.get_module_top_features(
     local_gene_sets=gene_sets_dir,
     gene_sets=['KEGG_2021_Human']  # Only KEGG pathways
 )
+
+# Using only KEGG_2019_Mouse
+tab, results = mod.get_module_top_features(
+    adata=adata,
+    background=background,
+    species='Mouse',
+    local_gene_sets=gene_sets_dir,
+    gene_sets=['KEGG_2019_Mouse']
+)
 ```
+
+### Gene Symbol Conversion
+
+**Important:** When using Mouse data, cell2fate automatically converts Human gene symbols to Mouse gene symbols for compatibility. This happens automatically when `species='Mouse'` is specified.
+
+- **Human gene symbols**: ALL CAPS (e.g., 'NQO1', 'CEBPB')
+- **Mouse gene symbols**: Title Case (e.g., 'Nqo1', 'Cebpb')
+
+The conversion is handled automatically by the `parse_gmt_file()` function when `convert_to_mouse=True`.
 
 ## Troubleshooting
 
@@ -186,19 +213,21 @@ tab, results = mod.get_module_top_features(
 If you see:
 ```
 Error: No gene set files found in /path/to/gene_sets.
-Looked for: ['GO_Biological_Process_2021.gmt']
+Looked for: ['HDSigDB_Mouse_2021.gmt', 'WikiPathways_2024_Mouse.gmt', 'Mouse_Gene_Atlas.gmt']
 ```
 
 **Solution:**
 1. Make sure you ran Step 1 to download the gene sets
 2. Check that the path is correct and accessible from compute nodes
 3. Verify the files exist: `ls /path/to/gene_sets/*.gmt`
+4. Check that you're using the correct species parameter
 
 ### Error: Connection refused / Name resolution error
 
 If you see connection errors on compute nodes:
 ```
 Failed to resolve 'maayanlab.cloud'
+ConnectionError: HTTPConnectionPool(host='maayanlab.cloud', port=80): Max retries exceeded
 ```
 
 **Solution:**
@@ -222,31 +251,20 @@ See `offline_enrichment_example.py` for a complete working example that includes
 - Offline enrichment analysis
 - Custom gene set usage
 
-## Available Gene Sets
 
-Common gene sets you can download:
 
-**For Mouse:**
-- `GO_Biological_Process_2021`
-- `GO_Cellular_Component_2021`
-- `GO_Molecular_Function_2021`
-- `KEGG_2019_Mouse`
+### Python Usage
 
-**For Human:**
-- `GO_Biological_Process_2021`
-- `GO_Cellular_Component_2021`
-- `GO_Molecular_Function_2021`
-- `KEGG_2021_Human`
-- `WikiPathways_2021_Human`
-- `Reactome_2022`
+```python
+# Offline enrichment with downloaded gene sets
+tab, results = mod.get_module_top_features(
+    adata=adata,
+    background=list(adata.var_names),
+    species='Mouse',  # or 'Human'
+    local_gene_sets='gene_sets',  # Path to downloaded gene sets
+    gene_sets=None  # Use defaults, or specify custom list
+)
+```
 
-## Summary
-
-The key steps are:
-
-1. **On login node (with internet):** Download gene sets using `download_gene_sets()` or the CLI
-2. **On compute node (no internet):** Use `local_gene_sets` parameter to use offline enrichment
-3. The `gene_sets` parameter controls which gene sets are used, both online and offline
-
-This approach ensures your analysis works on compute nodes without internet access while maintaining full functionality.
+This approach ensures your analysis works on compute nodes without internet access while maintaining full functionality and proper gene symbol handling.
 

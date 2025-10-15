@@ -15,6 +15,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 from pathlib import Path
+import click
 
 
 def run_cell2fate_pipeline_with_offline_enrichment(data_path, results_path, data_name='Pancreas_with_cc'):
@@ -49,6 +50,15 @@ def run_cell2fate_pipeline_with_offline_enrichment(data_path, results_path, data
         print(f"Successfully downloaded {len(downloaded_files)} gene set files:")
         for file_path in downloaded_files:
             print(f"  - {file_path}")
+        print(f"\nDefault gene sets for {species}:")
+        if species == 'Mouse':
+            print("  - HDSigDB_Mouse_2021")
+            print("  - WikiPathways_2024_Mouse") 
+            print("  - Mouse_Gene_Atlas")
+        else:
+            print("  - GO_Biological_Process_2021")
+            print("  - GO_Cellular_Component_2021")
+            print("  - KEGG_2021_Human")
             
     except Exception as e:
         print(f"Error downloading gene sets: {e}")
@@ -205,7 +215,7 @@ def demonstrate_custom_gene_sets(mod, adata, gene_sets_dir):
         p_adj_cutoff=0.01,
         n_top_genes=50,
         local_gene_sets=gene_sets_dir,
-        gene_sets=None  # Uses default: ['GO_Biological_Process_2021']
+        gene_sets=None  # Uses default: ['HDSigDB_Mouse_2021', 'WikiPathways_2024_Mouse', 'Mouse_Gene_Atlas']
     )
     print(f"Default gene sets results: {len(results_default)} modules analyzed")
     
@@ -263,6 +273,14 @@ def main():
     print("2. Ensure you have the required data file")
     print("3. Uncomment the function calls below")
     print("4. Run the script")
+    
+    print("\n=== Available CLI Commands ===")
+    print("# Download default Mouse gene sets:")
+    print("cell2fate download-genesets --species Mouse")
+    print("\n# Download default Human gene sets:")
+    print("cell2fate download-genesets --species Human")
+    print("\n# Download specific gene sets:")
+    print("cell2fate download-genesets --species Mouse --gene-sets GO_Biological_Process_2021 --gene-sets KEGG_2019_Mouse")
     
     # Uncomment the lines below when you have actual data:
     # mod, adata, tab, results = run_cell2fate_pipeline_with_offline_enrichment(data_path, results_path, data_name)
