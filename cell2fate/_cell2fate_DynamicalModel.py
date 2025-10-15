@@ -822,7 +822,7 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
             self.plot_history(int(np.round(self.max_epochs/2)))
         multiplot_from_generator(generatePlots(), 4)
 
-    def get_module_top_features(self, adata, background, species = 'Mouse', p_adj_cutoff = 0.01, n_top_genes = None, local_gene_sets = None, gene_sets = None):
+    def get_module_top_features(self, adata, background, species = 'Mouse', p_adj_cutoff = 0.01, n_top_genes = None, local_gene_sets = None, gene_sets = None, remap_to_mouse = False):
         """
         Returns a dataframe with top Genes, TFs, and GO terms of each module.
 
@@ -845,6 +845,10 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
             List of gene sets to use for enrichment analysis. If None, uses default sets:
             For Mouse: ['GO_Biological_Process_2021']
             For Human: ['GO_Biological_Process_2021', 'GO_Cellular_Component_2021', 'KEGG_2021_Human']
+        remap_to_mouse
+            If True, use HomoloGene database to convert Human gene symbols to Mouse gene symbols.
+            This provides more accurate ortholog mapping than simple capitalization-based conversion.
+            Defaults to False.
 
         Returns
         -------
@@ -917,8 +921,8 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
                 gmt_path = gene_sets_dir / gmt_file
                 if gmt_path.exists():
                     # Convert Human gene symbols to Mouse gene symbols for Mouse species
-                    convert_to_mouse = (species == 'Mouse')
-                    gene_sets_dict.update(parse_gmt_file(gmt_path, convert_to_mouse=convert_to_mouse))
+                    convert_to_mouse = (species == 'Mouse' and not remap_to_mouse)
+                    gene_sets_dict.update(parse_gmt_file(gmt_path, convert_to_mouse=convert_to_mouse, remap_to_mouse=remap_to_mouse))
                 else:
                     print(f"Warning: Gene set file {gmt_path} not found. Skipping.")
             

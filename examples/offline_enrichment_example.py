@@ -129,7 +129,8 @@ def run_cell2fate_pipeline_with_offline_enrichment(data_path, results_path, data
         p_adj_cutoff=0.01,
         n_top_genes=100,
         local_gene_sets=gene_sets_dir,  # Use offline gene sets
-        gene_sets=None  # Use default gene sets, or specify custom ones
+        gene_sets=None,  # Use default gene sets, or specify custom ones
+        remap_to_mouse=False  # Set to True for HomoloGene-based gene symbol conversion
     )
     
     # Display results
@@ -247,12 +248,27 @@ def demonstrate_custom_gene_sets(mod, adata, gene_sets_dir):
     )
     print(f"Specific Human gene sets results: {len(results_specific_human)} modules analyzed")
     
+    # Example 4: Use HomoloGene-based gene symbol conversion
+    print("\nExample 4: Using HomoloGene-based gene symbol conversion...")
+    tab_homologene, results_homologene = mod.get_module_top_features(
+        adata=adata,
+        background=background,
+        species='Mouse',
+        p_adj_cutoff=0.01,
+        n_top_genes=50,
+        local_gene_sets=gene_sets_dir,
+        gene_sets=['GO_Biological_Process_2021'],  # Human gene set
+        remap_to_mouse=True  # Use HomoloGene for accurate conversion
+    )
+    print(f"HomoloGene remapping results: {len(results_homologene)} modules analyzed")
+    
     print("\nCustom gene sets demonstration complete!")
     
     return {
         'default': (tab_default, results_default),
         'custom_mouse': (tab_custom_mouse, results_custom_mouse),
-        'specific_human': (tab_specific_human, results_specific_human)
+        'specific_human': (tab_specific_human, results_specific_human),
+        'homologene': (tab_homologene, results_homologene)
     }
 
 

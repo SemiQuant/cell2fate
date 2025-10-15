@@ -18,6 +18,7 @@ import cell2fate as c2f
 import click
 import requests
 from pathlib import Path
+import pandas as pd
 
 import torch
 
@@ -536,12 +537,45 @@ def download_gene_sets(output_dir='gene_sets', species='Human', gene_sets=None):
     click.echo(f"Downloaded {len(downloaded_files)} gene sets to {output_dir}")
     return downloaded_files
 
-def convert_human_to_mouse_gene_symbols(gene_symbols):
+def convert_human_to_mouse_gene_symbols(gene_symbols, use_homologene=False):
     """
     Convert Human gene symbols to Mouse gene symbols.
     
-    Human gene symbols are typically in ALL CAPS (e.g., 'NQO1', 'CEBPB')
-    Mouse gene symbols are typically in Title Case (e.g., 'Nqo1', 'Cebpb')
+    Parameters
+    ----------
+    gene_symbols : list
+        List of Human gene symbols
+    use_homologene : bool, default False
+        If True, use HomoloGene database for accurate ortholog mapping.
+        If False, use simple capitalization-based conversion.
+        
+    Returns
+    -------
+    list
+        List of Mouse gene symbols
+    """
+    if use_homologene:
+        return convert_human_to_mouse_gene_symbols_homologene(gene_symbols)
+    else:
+        # Original simple conversion method
+        mouse_symbols = []
+        for symbol in gene_symbols:
+            if symbol.isupper() and len(symbol) > 1:
+                # Convert ALL CAPS to Title Case
+                mouse_symbol = symbol.capitalize()
+                mouse_symbols.append(mouse_symbol)
+            else:
+                # Keep as is if not ALL CAPS
+                mouse_symbols.append(symbol)
+        return mouse_symbols
+
+def convert_human_to_mouse_gene_symbols_homologene(gene_symbols):
+    """
+    Convert Human gene symbols to Mouse gene symbols using HomoloGene database.
+    
+    This function uses the NCBI HomoloGene database to find orthologous genes
+    between human and mouse, providing more accurate mapping than simple
+    capitalization-based conversion.
     
     Parameters
     ----------
@@ -551,20 +585,85 @@ def convert_human_to_mouse_gene_symbols(gene_symbols):
     Returns
     -------
     list
-        List of Mouse gene symbols
+        List of Mouse gene symbols (unmapped genes remain as original)
     """
-    mouse_symbols = []
-    for symbol in gene_symbols:
-        if symbol.isupper() and len(symbol) > 1:
-            # Convert ALL CAPS to Title Case
-            mouse_symbol = symbol.capitalize()
-            mouse_symbols.append(mouse_symbol)
-        else:
-            # Keep as is if not ALL CAPS
-            mouse_symbols.append(symbol)
-    return mouse_symbols
+    try:
+        # Download HomoloGene data
+        homologene_url = "https://ftp.ncbi.nlm.nih.gov/pub/HomoloGene/current/homologene.data"
+        
+        with click.progressbar([1], label='Downloading HomoloGene data') as bar:
+            for _ in bar:
+                response = requests.get(homologene_url, timeout=30)
+                response.raise_for_status()
+                homologene_data = response.text
+        
+        # Parse HomoloGene data
+        homologene_map = {}
+        for line in homologene_data.strip().split('\n'):
+            parts = line.strip().split('\t')
+            if len(parts) >= 4:
+                homolog_group = parts[0]
+                tax_id = parts[1]
+                gene_id = parts[2]
+                gene_symbol = parts[3]
+                
+                if tax_id == '9606':  # Human
+                    if homolog_group not in homologene_map:
+                        homologene_map[homolog_group] = {}
+                    homologene_map[homolog_group]['human'] = gene_symbol
+                elif tax_id == '10090':  # Mouse
+                    if homolog_group not in homologene_map:
+                        homologene_map[homolog_group] = {}
+                    homologene_map[homolog_group]['mouse'] = gene_symbol
+        
+        # Create human to mouse mapping
+        human_to_mouse = {}
+        for homolog_group, species_data in homologene_map.items():
+            if 'human' in species_data and 'mouse' in species_data:
+                human_to_mouse[species_data['human']] = species_data['mouse']
+        
+        # Convert gene symbols
+        mouse_symbols = []
+        mapped_count = 0
+        
+        for symbol in gene_symbols:
+            if symbol in human_to_mouse:
+                mouse_symbols.append(human_to_mouse[symbol])
+                mapped_count += 1
+            else:
+                # Fallback to simple capitalization if not found in HomoloGene
+                if symbol.isupper() and len(symbol) > 1:
+                    mouse_symbols.append(symbol.capitalize())
+                else:
+                    mouse_symbols.append(symbol)
+        
+        click.echo(f"Mapped {mapped_count}/{len(gene_symbols)} genes using HomoloGene")
+        return mouse_symbols
+        
+    except requests.RequestException as e:
+        click.echo(f"Warning: Could not download HomoloGene data: {e}", err=True)
+        click.echo("Falling back to simple capitalization-based conversion")
+        # Fallback to simple conversion
+        mouse_symbols = []
+        for symbol in gene_symbols:
+            if symbol.isupper() and len(symbol) > 1:
+                mouse_symbols.append(symbol.capitalize())
+            else:
+                mouse_symbols.append(symbol)
+        return mouse_symbols
+    except Exception as e:
+        click.echo(f"Warning: Error in HomoloGene mapping: {e}", err=True)
+        click.echo("Falling back to simple capitalization-based conversion")
+        # Fallback to simple conversion
+        mouse_symbols = []
+        for symbol in gene_symbols:
+            if symbol.isupper() and len(symbol) > 1:
+                mouse_symbols.append(symbol.capitalize())
+            else:
+                mouse_symbols.append(symbol)
+        return mouse_symbols
 
-def parse_gmt_file(gmt_file, convert_to_mouse=False):
+def parse_gmt_file(gmt_file, convert_to_mouse=False, remap_to_mouse=False):
     """
     Parse a GMT (Gene Matrix Transpose) file and return gene sets.
     
@@ -572,8 +671,10 @@ def parse_gmt_file(gmt_file, convert_to_mouse=False):
     ----------
     gmt_file
         Path to GMT file.
-    convert_to_mouse : bool
-        If True, convert Human gene symbols to Mouse gene symbols.
+    convert_to_mouse : bool, default False
+        If True, convert Human gene symbols to Mouse gene symbols using simple capitalization.
+    remap_to_mouse : bool, default False
+        If True, convert Human gene symbols to Mouse gene symbols using HomoloGene database.
         
     Returns
     -------
@@ -590,8 +691,10 @@ def parse_gmt_file(gmt_file, convert_to_mouse=False):
                 description = parts[1]
                 genes = parts[2:]
                 
-                if convert_to_mouse:
-                    genes = convert_human_to_mouse_gene_symbols(genes)
+                if remap_to_mouse:
+                    genes = convert_human_to_mouse_gene_symbols(genes, use_homologene=True)
+                elif convert_to_mouse:
+                    genes = convert_human_to_mouse_gene_symbols(genes, use_homologene=False)
                 
                 gene_sets[gene_set_name] = genes
     

@@ -206,6 +206,34 @@ tab, results = mod.get_module_top_features(
 
 The conversion is handled automatically by the `parse_gmt_file()` function when `convert_to_mouse=True`.
 
+### Advanced Gene Symbol Remapping with HomoloGene
+
+For more accurate gene symbol conversion, you can use the HomoloGene database instead of simple capitalization:
+
+```python
+# Use HomoloGene database for accurate ortholog mapping
+tab, results = mod.get_module_top_features(
+    adata=adata,
+    background=background,
+    species='Mouse',
+    local_gene_sets=gene_sets_dir,
+    remap_to_mouse=True  # Use HomoloGene database for gene symbol conversion
+)
+```
+
+**Benefits of HomoloGene remapping:**
+- More accurate ortholog mapping between human and mouse genes
+- Handles gene symbol differences that simple capitalization cannot
+- Uses NCBI's curated HomoloGene database
+- Automatically falls back to simple conversion if HomoloGene data is unavailable
+
+**When to use `remap_to_mouse=True`:**
+- When working with human gene sets on mouse data
+- When you need the most accurate gene symbol mapping
+- When simple capitalization-based conversion is insufficient
+
+**Note:** HomoloGene remapping requires internet access to download the database. If the download fails, the function automatically falls back to simple capitalization-based conversion.
+
 ## Troubleshooting
 
 ### Error: No gene set files found
