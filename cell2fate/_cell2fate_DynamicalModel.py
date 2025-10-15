@@ -703,8 +703,19 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
             Number of columns in the legend.
         """
         n_modules = self.module.model.n_modules
+        
+        # Filter chosen_modules to only include valid indices
+        valid_modules = [m for m in chosen_modules if 0 <= m < n_modules]
+        if len(valid_modules) != len(chosen_modules):
+            invalid_modules = [m for m in chosen_modules if m < 0 or m >= n_modules]
+            print(f"Warning: Skipping invalid module indices {invalid_modules}. "
+                  f"Valid module indices are 0 to {n_modules-1}.")
+        
+        if not valid_modules:
+            raise ValueError(f"No valid module indices provided. Valid indices are 0 to {n_modules-1}.")
+        
         fig, ax = plt.subplots(1, 1, figsize=(18, 5))
-        for m in chosen_modules:
+        for m in valid_modules:
             T_c = torch.tensor(0.).unsqueeze(-1).unsqueeze(-1)
             Tmax = self.samples['post_sample_means']['Tmax']
             count = 0
@@ -853,7 +864,7 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
         elif species == 'Mouse':
             TFs = np.array(pd.read_csv(c2f.__file__[:-11] + 'Mouse_TFs.txt', header=None, index_col=False)).flatten()
         TFs = np.array([tf for tf in TFs if tf in adata.var_names])
-        gene_by_module_weight = torch.zeros((self.module.model.n_modules, self.module.model.n_vars))
+        gene_by_module_weight = np.zeros((self.module.model.n_modules, self.module.model.n_vars))
         gene_by_module_sorted = np.empty((self.module.model.n_modules, self.module.model.n_vars), dtype=object)
         TF_by_module_sorted = np.empty((self.module.model.n_modules, len(TFs)), dtype=object)
         TF_boolean = np.array([g in TFs for g in adata.var_names])
@@ -869,7 +880,10 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
                 torch.tensor(self.samples['post_sample_means']['T_mON'][:,:,m]),
                 torch.tensor(self.samples['post_sample_means']['T_mOFF'][:,:,m]),
                 torch.zeros((self.module.model.n_obs, self.module.model.n_vars)))
-            gene_by_module_weight[m,:] = torch.sum(mu_m[...,1], axis = 0)/inferred_total
+            # Fix: Convert tensors to numpy before assignment to avoid type mismatch
+            mu_m_numpy = mu_m.detach().numpy()
+            inferred_total_numpy = inferred_total.detach().numpy()
+            gene_by_module_weight[m,:] = np.sum(mu_m_numpy[...,1], axis=0) / inferred_total_numpy
             gene_by_module_sorted[m,:] = adata.var_names[np.argsort(-1*gene_by_module_weight[m,:])]
             TF_by_module_sorted[m,:] = adata.var_names[TF_boolean][np.argsort(-1*gene_by_module_weight[m,TF_boolean])]
             tab.iloc[m,1] = ', '.join(list(gene_by_module_sorted[m,:]))
@@ -990,6 +1004,19 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
         process
             Whether to preprocess the data.
         """
+        n_modules = self.module.model.n_modules
+        
+        # Filter chosen_modules to only include valid indices
+        valid_modules = [m for m in chosen_modules if 0 <= m < n_modules]
+        if len(valid_modules) != len(chosen_modules):
+            invalid_modules = [m for m in chosen_modules if m < 0 or m >= n_modules]
+            print(f"Warning: Skipping invalid module indices {invalid_modules}. "
+                  f"Valid module indices are 0 to {n_modules-1}.")
+        
+        if not valid_modules:
+            raise ValueError(f"No valid module indices provided. Valid indices are 0 to {n_modules-1}.")
+        
+        chosen_modules = valid_modules
         if process:
             print('Reprocessing adata.X, set process = False if this is not desired.')
             adata.X = adata.layers['unspliced'] + adata.layers['spliced']
@@ -1031,6 +1058,19 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
         save
             Filepath to save the plot.
         """
+        n_modules = self.module.model.n_modules
+        
+        # Filter chosen_modules to only include valid indices
+        valid_modules = [m for m in chosen_modules if 0 <= m < n_modules]
+        if len(valid_modules) != len(chosen_modules):
+            invalid_modules = [m for m in chosen_modules if m < 0 or m >= n_modules]
+            print(f"Warning: Skipping invalid module indices {invalid_modules}. "
+                  f"Valid module indices are 0 to {n_modules-1}.")
+        
+        if not valid_modules:
+            raise ValueError(f"No valid module indices provided. Valid indices are 0 to {n_modules-1}.")
+        
+        chosen_modules = valid_modules
         limit = np.max([np.sort(adata.obs['Module ' + str(i) + ' Activation'])[int(np.round(0.99*len(adata.obs['Module ' + str(i) + ' Activation'])))]
                         for i in chosen_modules])
         adata.X = adata.layers['unspliced'] + adata.layers['spliced']
@@ -1067,6 +1107,12 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
     
     def example_module_activation(self, adata, chosen_module, time_max = None, time_min = 0,
                                  save = None):
+        n_modules = self.module.model.n_modules
+        
+        # Check if chosen_module is valid
+        if chosen_module < 0 or chosen_module >= n_modules:
+            raise ValueError(f"Invalid module index {chosen_module}. Valid module indices are 0 to {n_modules-1}.")
+        
         fig, ax = plt.subplots(1, 1, figsize=(10, 5))
         m = chosen_module
         n_obs = 10000
@@ -1279,6 +1325,11 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
         plotting_kwargs
             Additional keyword arguments for customizing the plot appearance, by default ``{"color": 'clusters', 'legend_fontsize': 10, 'legend_loc': 'on data', 'dpi': 300, 'cmap': 'inferno'}``.
         """
+        n_modules = self.module.model.n_modules
+        
+        # Check if chosen_module is valid
+        if chosen_module < 0 or chosen_module >= n_modules:
+            raise ValueError(f"Invalid module index {chosen_module}. Valid module indices are 0 to {n_modules-1}.")
 
         
         adata_groups = {}

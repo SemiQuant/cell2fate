@@ -471,6 +471,12 @@ def mu_mRNA_continousAlpha_globalTime_twoStates(alpha_ON, alpha_OFF, beta, gamma
     delta_alpha = ~boolean*initial_alpha*(-1) + boolean*alpha_ON*(1)
     alpha_0 = alpha_OFF + ~boolean*initial_alpha
     # Unspliced and spliced count variance for each gene in each cell:
+    # TODO: For PyTorch 2.0+ compatibility, replace torch.clip with torch.clamp
+    # torch.clip was deprecated and removed in PyTorch 2.0
+    # CHANGE: mu_RNAvelocity = torch.clip(mu_mRNA_continuousAlpha(alpha_cg, beta, gamma, tau_cg,
+    #                                                              u0_g, s0_g, delta_alpha, lam_g), min = 10**(-5))
+    # TO:     mu_RNAvelocity = torch.clamp(mu_mRNA_continuousAlpha(alpha_cg, beta, gamma, tau_cg,
+    #                                                              u0_g, s0_g, delta_alpha, lam_g), min = 10**(-5))
     mu_RNAvelocity = torch.clip(mu_mRNA_continuousAlpha(alpha_cg, beta, gamma, tau_cg,
                                                          u0_g, s0_g, delta_alpha, lam_g), min = 10**(-5))
     return mu_RNAvelocity

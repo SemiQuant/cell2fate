@@ -1089,7 +1089,8 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan):
                         aggressive_vars_status="expose",
                         non_aggressive_vars_status="hide",
                     )
-                loss = torch.Tensor([self.svi.step(*args, **kwargs)])
+                # PyTorch 2.0+ compatibility: using torch.tensor instead of deprecated torch.Tensor
+                loss = torch.tensor([self.svi.step(*args, **kwargs)])
             else:
                 self.aggressive_steps_counter = 0
                 # Do parameter update exclusively for non-amortised variables
@@ -1103,13 +1104,13 @@ class PyroAggressiveTrainingPlan1(PyroTrainingPlan):
                         aggressive_vars_status="hide",
                         non_aggressive_vars_status="expose",
                     )
-                loss = torch.Tensor([self.svi.step(*args, **kwargs)])
+                # PyTorch 2.0+ compatibility: using torch.tensor instead of deprecated torch.Tensor
+                loss = torch.tensor([self.svi.step(*args, **kwargs)])
         else:
             # Do parameter update for both types of variables
             self.change_requires_grad(
                 aggressive_vars_status="expose",
                 non_aggressive_vars_status="expose",
             )
-            loss = torch.Tensor([self.svi.step(*args, **kwargs)])
-
-        return {"loss": loss}
+            # PyTorch 2.0+ compatibility: using torch.tensor instead of deprecated torch.Tensor
+            loss = torch.tensor([self.svi.step(*args, **kwargs)])
