@@ -515,7 +515,7 @@ def download_gene_sets(output_dir='gene_sets', species='Human', gene_sets=None):
     
     with click.progressbar(gene_sets, label='Downloading gene sets') as bar:
         for gene_set in bar:
-            url = f"https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName={gene_set}"
+            url = f"https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName={gene_set}&species={species.lower()}"
             output_file = output_path / f"{gene_set}.gmt"
             
             try:
