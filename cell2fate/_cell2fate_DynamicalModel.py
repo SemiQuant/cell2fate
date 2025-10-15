@@ -547,7 +547,7 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
             with contextlib.redirect_stdout(io.StringIO()):
                 mu_m = mu_mRNA_continousAlpha_globalTime_twoStates(
                             torch.tensor(self.samples['post_sample_means']['A_mgON'][m,:]),
-                            torch.tensor(0., dtype = torch.float),
+                            torch.tensor(0., dtype = torch.float32),
                             torch.tensor(self.samples['post_sample_means']['beta_g']),
                             torch.tensor(self.samples['post_sample_means']['gamma_g']),
                             torch.tensor(self.samples['post_sample_means']['lam_mi'][m,:]),

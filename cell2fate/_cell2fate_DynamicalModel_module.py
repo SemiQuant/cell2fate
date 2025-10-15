@@ -89,7 +89,7 @@ class Cell2fate_DynamicalModel_module(PyroModule):
             self.np_init_vals = init_vals
             for k in init_vals.keys():
                 if k == 'I_cm':
-                    self.register_buffer(f"init_val_{k}", torch.tensor(init_vals[k], dtype = torch.long))
+                    self.register_buffer(f"init_val_{k}", torch.tensor(init_vals[k], dtype = torch.int64))
                 else:
                     self.register_buffer(f"init_val_{k}", torch.tensor(init_vals[k]))
          
