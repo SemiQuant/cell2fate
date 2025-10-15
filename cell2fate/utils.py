@@ -503,8 +503,8 @@ def download_gene_sets(output_dir='gene_sets', species='Human', gene_sets=None):
         if species == 'Human':
             gene_sets = ['GO_Biological_Process_2021', 'GO_Cellular_Component_2021', 'KEGG_2021_Human']
         elif species == 'Mouse':
-            # Use Mouse-specific libraries that actually exist in Enrichr
-            gene_sets = ['MGI_Mammalian_Phenotype_Level_4', 'MGI_Mammalian_Phenotype_Level_3', 'Mouse_Gene_Atlas', 'WikiPathways_2024_Mouse', 'KEGG_2019_Mouse', 'HDSigDB_Mouse_2021']
+            # Use HDSigDB_Mouse_2021 as default for Mouse gene sets
+            gene_sets = ['HDSigDB_Mouse_2021']
         else:
             raise ValueError(f"Unsupported species: {species}. Use 'Human' or 'Mouse'.")
     

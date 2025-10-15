@@ -899,7 +899,7 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
         # Set default gene sets if not provided
         if gene_sets is None:
             if species == 'Mouse':
-                gene_sets = ['GO_Biological_Process_2021']  # 'GO_Cellular_Component_2021', 'KEGG_2019_Mouse'
+                gene_sets = ['HDSigDB_Mouse_2021']  # Default Mouse gene set
             elif species == 'Human':
                 gene_sets = ['GO_Biological_Process_2021', 'GO_Cellular_Component_2021', 'KEGG_2021_Human']
         
