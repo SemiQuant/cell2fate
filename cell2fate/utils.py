@@ -504,7 +504,7 @@ def download_gene_sets(output_dir='gene_sets', species='Human', gene_sets=None):
             gene_sets = ['GO_Biological_Process_2021', 'GO_Cellular_Component_2021', 'KEGG_2021_Human']
         elif species == 'Mouse':
             # Use HDSigDB_Mouse_2021 as default for Mouse gene sets
-            gene_sets = ['HDSigDB_Mouse_2021']
+            gene_sets = ['HDSigDB_Mouse_2021', 'WikiPathways_2024_Mouse', 'Mouse_Gene_Atlas']
         else:
             raise ValueError(f"Unsupported species: {species}. Use 'Human' or 'Mouse'.")
     
