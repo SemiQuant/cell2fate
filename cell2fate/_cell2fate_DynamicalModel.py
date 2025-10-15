@@ -37,7 +37,7 @@ from cell2fate._pyro_mixin import QuantileMixin
 from ._cell2fate_DynamicalModel_module import \
 Cell2fate_DynamicalModel_module
 from cell2fate.utils import multiplot_from_generator
-from cell2fate.utils import offline_enrichment, offline_enrichment_with_mapping, parse_gmt_file
+from cell2fate.utils import offline_enrichment, parse_gmt_file
 
 from cell2fate.utils import mu_mRNA_continousAlpha_globalTime_twoStates
 import cell2fate as c2f
@@ -924,38 +924,13 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
                 print(f"Error: No gene set files found in {gene_sets_dir}.")
                 print(f"Looked for: {gene_set_files}")
                 print("Skipping enrichment analysis. Returning gene rankings only.")
-            
-            # Check if we need gene mapping (Mouse data with Human gene sets)
-            if species == 'Mouse' and gene_sets_dict:
-                # Sample a few genes to check if gene sets contain Human gene names
-                sample_genes = list(gene_sets_dict.values())[0][:5] if gene_sets_dict else []
-                sample_background = list(adata.var_names)[:5]
-                
-                # Check if there's a species mismatch
-                has_overlap = any(gene in sample_background for gene in sample_genes)
-                
-                if not has_overlap:
-                    print(f"Detected Mouse data with Human gene sets. Setting up automatic gene mapping...")
-                    # This will be handled in the enrichment loop below
         
         for m in range(n_modules):
             gene_list = list(gene_by_module_sorted[m,:n_top_genes])
             
             if local_gene_sets is not None and gene_sets_dict:
-                # Check if we need gene mapping (Mouse data with Human gene sets)
-                sample_genes = list(gene_sets_dict.values())[0][:5] if gene_sets_dict else []
-                sample_background = list(adata.var_names)[:5]
-                has_overlap = any(gene in sample_background for gene in sample_genes)
-                
-                if species == 'Mouse' and not has_overlap:
-                    # Use offline enrichment with automatic Mouse-to-Human mapping
-                    if m == 0:  # Only print this message once
-                        print("Using automatic Mouse-to-Human gene mapping for enrichment analysis...")
-                    enr_results = offline_enrichment_with_mapping(gene_list, background, gene_sets_dict, p_adj_cutoff)
-                else:
-                    # Use regular offline enrichment (same species or already compatible)
-                    enr_results = offline_enrichment(gene_list, background, gene_sets_dict, p_adj_cutoff)
-                
+                # Use offline enrichment
+                enr_results = offline_enrichment(gene_list, background, gene_sets_dict, p_adj_cutoff)
                 # Create a mock object with results attribute to maintain compatibility
                 class MockEnrichrResult:
                     def __init__(self, results_df):
