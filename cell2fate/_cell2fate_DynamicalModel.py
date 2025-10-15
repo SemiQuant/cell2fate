@@ -916,7 +916,9 @@ class Cell2fate_DynamicalModel(QuantileMixin, PyroSampleMixin, PyroSviTrainMixin
             for gmt_file in gene_set_files:
                 gmt_path = gene_sets_dir / gmt_file
                 if gmt_path.exists():
-                    gene_sets_dict.update(parse_gmt_file(gmt_path))
+                    # Convert Human gene symbols to Mouse gene symbols for Mouse species
+                    convert_to_mouse = (species == 'Mouse')
+                    gene_sets_dict.update(parse_gmt_file(gmt_path, convert_to_mouse=convert_to_mouse))
                 else:
                     print(f"Warning: Gene set file {gmt_path} not found. Skipping.")
             

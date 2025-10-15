@@ -504,7 +504,7 @@ def download_gene_sets(output_dir='gene_sets', species='Human', gene_sets=None):
             gene_sets = ['GO_Biological_Process_2021', 'GO_Cellular_Component_2021', 'KEGG_2021_Human']
         elif species == 'Mouse':
             # Use Mouse-specific libraries that actually exist in Enrichr
-            gene_sets = ['MGI_Mammalian_Phenotype_Level_4', 'MGI_Mammalian_Phenotype_Level_3', 'Mouse_Gene_Atlas', 'ENCODE_and_Chromosome_State_Mouse', 'WikiPathways_2024_Mouse', 'KEGG_2019_Mouse', 'HDSigDB_Mouse_2021']
+            gene_sets = ['MGI_Mammalian_Phenotype_Level_4', 'MGI_Mammalian_Phenotype_Level_3', 'Mouse_Gene_Atlas', 'WikiPathways_2024_Mouse', 'KEGG_2019_Mouse', 'HDSigDB_Mouse_2021']
         else:
             raise ValueError(f"Unsupported species: {species}. Use 'Human' or 'Mouse'.")
     
@@ -536,7 +536,35 @@ def download_gene_sets(output_dir='gene_sets', species='Human', gene_sets=None):
     click.echo(f"Downloaded {len(downloaded_files)} gene sets to {output_dir}")
     return downloaded_files
 
-def parse_gmt_file(gmt_file):
+def convert_human_to_mouse_gene_symbols(gene_symbols):
+    """
+    Convert Human gene symbols to Mouse gene symbols.
+    
+    Human gene symbols are typically in ALL CAPS (e.g., 'NQO1', 'CEBPB')
+    Mouse gene symbols are typically in Title Case (e.g., 'Nqo1', 'Cebpb')
+    
+    Parameters
+    ----------
+    gene_symbols : list
+        List of Human gene symbols
+        
+    Returns
+    -------
+    list
+        List of Mouse gene symbols
+    """
+    mouse_symbols = []
+    for symbol in gene_symbols:
+        if symbol.isupper() and len(symbol) > 1:
+            # Convert ALL CAPS to Title Case
+            mouse_symbol = symbol.capitalize()
+            mouse_symbols.append(mouse_symbol)
+        else:
+            # Keep as is if not ALL CAPS
+            mouse_symbols.append(symbol)
+    return mouse_symbols
+
+def parse_gmt_file(gmt_file, convert_to_mouse=False):
     """
     Parse a GMT (Gene Matrix Transpose) file and return gene sets.
     
@@ -544,6 +572,8 @@ def parse_gmt_file(gmt_file):
     ----------
     gmt_file
         Path to GMT file.
+    convert_to_mouse : bool
+        If True, convert Human gene symbols to Mouse gene symbols.
         
     Returns
     -------
@@ -559,6 +589,10 @@ def parse_gmt_file(gmt_file):
                 gene_set_name = parts[0]
                 description = parts[1]
                 genes = parts[2:]
+                
+                if convert_to_mouse:
+                    genes = convert_human_to_mouse_gene_symbols(genes)
+                
                 gene_sets[gene_set_name] = genes
     
     return gene_sets
